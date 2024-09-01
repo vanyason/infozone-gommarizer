@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Test getting html page
-	html, err := rustorka.FetchHTML("https://rustorka.com/forum/top.php?mode=release&stat=30days", jar)
+	html, err := rustorka.FetchLast30DaysHTML(jar)
 	if err != nil {
 		logger.Error("Error while fetching HTML", "error", err.Error())
 		return
@@ -46,4 +46,19 @@ func main() {
 		}
 	}
 
+	// Test parsing html
+	topics, err := rustorka.ParseLast30DaysHTML(html)
+	if err != nil {
+		logger.Error("Error while parsing HTML", "error", err.Error())
+		return
+	} else {
+		logger.Info("HTML parsed")
+		for _, topic := range topics {
+			logger.Debug("Topic", "url", topic)
+		}
+	}
+
+	// Test getting topics
+
+	// Test parsing topics
 }

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/vanyason/infozone-gommaraizer/pkg/logger"
+	"golang.org/x/net/html"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/transform"
 )
@@ -15,6 +16,7 @@ import (
 const (
 	ForumURL = "https://rustorka.com/forum/"
 	LoginURL = "https://rustorka.com/forum/login.php"
+	Top30URL = "https://rustorka.com/forum/top.php?mode=release&stat=30days"
 
 	UserAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0"
 )
@@ -75,7 +77,7 @@ func GetRustorkaAuthToken() (*cookiejar.Jar, error) {
 // FetchHTML fetches HTML from the given URL, using the provided cookie jar for auth.
 // The function returns the HTML as a string, or an error if something goes wrong.
 // The cookie jar is required, since it holds authentication data.
-func FetchHTML(url string, jar *cookiejar.Jar) (string, error) {
+func fetchHTML(url string, jar *cookiejar.Jar) (string, error) {
 	logger.Info("Fetching HTML from", "url", url)
 
 	// Create an HTTP GET request
@@ -115,4 +117,48 @@ func FetchHTML(url string, jar *cookiejar.Jar) (string, error) {
 
 	// Return the HTML as a string
 	return string(body), nil
+}
+
+// FetchLast30DaysHTML fetches the HTML of the Rustorka top downloads for the last 30 days.
+// It returns the HTML as a string, or an error if something goes wrong.
+// The cookie jar is required, since it holds authentication data.
+func FetchLast30DaysHTML(jar *cookiejar.Jar) (string, error) {
+	logger.Info("Getting Rustorka last 30 days top downloads")
+	return fetchHTML(Top30URL, jar)
+}
+
+type TopicURL string
+
+// ParseLast30DaysHTML parses the HTML of the Rustorka top downloads for the last 30 days, and returns a slice of URLs of the topics.
+// It returns an error if something goes wrong.
+func ParseLast30DaysHTML(htmlString string) ([]TopicURL, error) {
+	logger.Info("Parsing Rustorka last 30 days top downloads HTML")
+
+	doc, err := html.Parse(strings.NewReader(htmlString))
+	if err != nil {
+		return nil, err
+	}
+
+	topics := make([]TopicURL, 0, 30)
+
+	var extractLinks func(n *html.Node)
+	extractLinks = func(n *html.Node) {
+		// Check if the node is an element node with the <a> tag
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" && strings.Contains(attr.Val, "viewtopic.php?t=") {
+					topics = append(topics, TopicURL(ForumURL+attr.Val))
+				}
+			}
+		}
+
+		// Recursively traverse the child nodes
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			extractLinks(c)
+		}
+	}
+
+	extractLinks(doc)
+
+	return topics, nil
 }
