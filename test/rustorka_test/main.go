@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 
@@ -31,13 +32,13 @@ func main() {
 		}
 	}
 
-	// Test getting html page
+	// Test getting 30 days top html page
 	html, err := rustorka.FetchLast30DaysHTML(jar)
 	if err != nil {
 		logger.Error("Error while fetching HTML", "error", err.Error())
 		return
 	} else {
-		filename := "rustorka.html"
+		filename := "rustorka-top30.html"
 		logger.Info("HTML fetched. Saving to file", "file", filename)
 		err := os.WriteFile(filename, []byte(html), 0644)
 		if err != nil {
@@ -46,19 +47,43 @@ func main() {
 		}
 	}
 
-	// Test parsing html
-	topics, err := rustorka.ParseLast30DaysHTML(html)
+	// Test parsing 30 days top html page - retrieve topic descriptions
+	topicDescriptions, err := rustorka.ParseLast30DaysHTML(html)
 	if err != nil {
 		logger.Error("Error while parsing HTML", "error", err.Error())
 		return
 	} else {
 		logger.Info("HTML parsed")
-		for _, topic := range topics {
+		logger.Info("Topic descriptions", "count", len(topicDescriptions))
+
+		logger.Debug("As a manual tester, compare topic descriptions against original urls MANUALLY", "url", rustorka.Top30URL)
+		for _, topic := range topicDescriptions {
 			logger.Debug("Topic", "url", topic)
 		}
 	}
 
-	// Test getting topics
+	// Test fetching topics
+	errorWhileFetching := false
+	for i, td := range topicDescriptions {
+		html, err := rustorka.FetchTopicHTML(td, jar)
+		if err != nil {
+			logger.Error("Error while fetching topic HTML", "topicHeader", td.Header, "error", err.Error())
+			errorWhileFetching = true
+		} else {
+			filename := fmt.Sprintf("rustorka-%d.html", i)
+			logger.Info("Topic HTML fetched. Saving to file", "file", filename)
+			err := os.WriteFile(filename, []byte(html), 0644)
+			if err != nil {
+				logger.Error("Error while saving topic HTML", "topicHeader", td.Header, "error", err.Error())
+				errorWhileFetching = true
+			}
+		}
+	}
+
+	if errorWhileFetching {
+		logger.Error("Error while fetching topics HTML. Return")
+		return
+	}
 
 	// Test parsing topics
 }

@@ -127,11 +127,14 @@ func FetchLast30DaysHTML(jar *cookiejar.Jar) (string, error) {
 	return fetchHTML(Top30URL, jar)
 }
 
-type TopicURL string
+type TopicDescription struct {
+	Header string
+	URL    string
+}
 
 // ParseLast30DaysHTML parses the HTML of the Rustorka top downloads for the last 30 days, and returns a slice of URLs of the topics.
 // It returns an error if something goes wrong.
-func ParseLast30DaysHTML(htmlString string) ([]TopicURL, error) {
+func ParseLast30DaysHTML(htmlString string) ([]TopicDescription, error) {
 	logger.Info("Parsing Rustorka last 30 days top downloads HTML")
 
 	doc, err := html.Parse(strings.NewReader(htmlString))
@@ -139,7 +142,7 @@ func ParseLast30DaysHTML(htmlString string) ([]TopicURL, error) {
 		return nil, err
 	}
 
-	topics := make([]TopicURL, 0, 30)
+	topics := make([]TopicDescription, 0, 30)
 
 	var extractLinks func(n *html.Node)
 	extractLinks = func(n *html.Node) {
@@ -147,7 +150,7 @@ func ParseLast30DaysHTML(htmlString string) ([]TopicURL, error) {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, attr := range n.Attr {
 				if attr.Key == "href" && strings.Contains(attr.Val, "viewtopic.php?t=") {
-					topics = append(topics, TopicURL(ForumURL+attr.Val))
+					topics = append(topics, TopicDescription{n.FirstChild.Data, ForumURL + attr.Val})
 				}
 			}
 		}
@@ -161,4 +164,13 @@ func ParseLast30DaysHTML(htmlString string) ([]TopicURL, error) {
 	extractLinks(doc)
 
 	return topics, nil
+}
+
+// FetchTopicHTML fetches the HTML of the given Rustorka topic.
+// It logs info about the topic being fetched, and returns the HTML as a string,
+// or an error if something goes wrong.
+// The cookie jar is required, since it holds authentication data.
+func FetchTopicHTML(topic TopicDescription, jar *cookiejar.Jar) (string, error) {
+	logger.Info("Fetching Rustorka topic", "Header", topic.Header, "url", topic.URL)
+	return fetchHTML(topic.URL, jar)
 }
