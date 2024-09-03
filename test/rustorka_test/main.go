@@ -58,7 +58,7 @@ func main() {
 
 		logger.Debug("As a manual tester, compare topic descriptions against original urls MANUALLY", "url", rustorka.Top30URL)
 		for _, topic := range topicDescriptions {
-			logger.Debug("Topic", "url", topic)
+			logger.Debug("Topic", "URL", topic)
 		}
 	}
 
@@ -67,14 +67,14 @@ func main() {
 	for i, td := range topicDescriptions {
 		html, err := rustorka.FetchTopicHTML(td, jar)
 		if err != nil {
-			logger.Error("Error while fetching topic HTML", "topicHeader", td.Header, "error", err.Error())
+			logger.Error("Error while fetching topic HTML", "topic Title", td.Title, "topic URL", td.URL, "error", err.Error())
 			errorWhileFetching = true
 		} else {
 			filename := fmt.Sprintf("rustorka-%d.html", i)
-			logger.Info("Topic HTML fetched. Saving to file", "file", filename)
+			logger.Info("Topic HTML fetched. Saving to file", "topic Title", td.Title, "topic URL", td.URL, "file", filename)
 			err := os.WriteFile(filename, []byte(html), 0644)
 			if err != nil {
-				logger.Error("Error while saving topic HTML", "topicHeader", td.Header, "error", err.Error())
+				logger.Error("Error while saving topic HTML", "topic Title", td.Title, "error", err.Error())
 				errorWhileFetching = true
 			}
 		}

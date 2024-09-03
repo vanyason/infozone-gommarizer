@@ -128,8 +128,8 @@ func FetchLast30DaysHTML(jar *cookiejar.Jar) (string, error) {
 }
 
 type TopicDescription struct {
-	Header string
-	URL    string
+	Title string
+	URL   string
 }
 
 // ParseLast30DaysHTML parses the HTML of the Rustorka top downloads for the last 30 days, and returns a slice of URLs of the topics.
@@ -171,6 +171,6 @@ func ParseLast30DaysHTML(htmlString string) ([]TopicDescription, error) {
 // or an error if something goes wrong.
 // The cookie jar is required, since it holds authentication data.
 func FetchTopicHTML(topic TopicDescription, jar *cookiejar.Jar) (string, error) {
-	logger.Info("Fetching Rustorka topic", "Header", topic.Header, "url", topic.URL)
+	logger.Info("Fetching Rustorka topic", "Title", topic.Title, "url", topic.URL)
 	return fetchHTML(topic.URL, jar)
 }
