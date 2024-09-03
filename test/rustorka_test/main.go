@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"sync"
@@ -11,6 +9,7 @@ import (
 
 	"github.com/vanyason/infozone-gommaraizer/pkg/logger"
 	"github.com/vanyason/infozone-gommaraizer/pkg/scrapper/rustorka"
+	"github.com/vanyason/infozone-gommaraizer/pkg/utils"
 )
 
 func main() {
@@ -76,24 +75,7 @@ func main() {
 	var counter atomic.Int32
 
 	topicDescriptionsChan := make(chan rustorka.TopicDescription, len(topicDescriptions))
-	numWorkers := len(topicDescriptions)
-
-	copyJar := func(jar *cookiejar.Jar) (*cookiejar.Jar, error) { //< copy jar for concurrent use
-		if jar == nil {
-			return nil, fmt.Errorf("nil cookie jar")
-		}
-
-		newJar, err := cookiejar.New(nil)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, cookie := range jar.Cookies(u) {
-			newJar.SetCookies(u, []*http.Cookie{cookie})
-		}
-
-		return newJar, nil
-	}
+	numWorkers := utils.OptimalGoroutines(true)
 
 	for i := 0; i < numWorkers; i++ { //< spawn workers
 		wg.Add(1)
@@ -102,7 +84,7 @@ func main() {
 			defer wg.Done()
 
 			for topic := range topicDescriptionsChan {
-				newJar, err := copyJar(jar)
+				newJar, err := utils.CopyJar(jar, u)
 				if err != nil {
 					logger.Error("Error while copying cookie jar", "error", err.Error())
 					errorWhileFetching.Store(true)
