@@ -2,8 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sync"
+	"sync/atomic"
 
 	"github.com/vanyason/infozone-gommaraizer/pkg/logger"
 	"github.com/vanyason/infozone-gommaraizer/pkg/scrapper/rustorka"
@@ -63,27 +67,81 @@ func main() {
 	}
 
 	// Test fetching topics
-	errorWhileFetching := false
-	for i, td := range topicDescriptions {
-		html, err := rustorka.FetchTopicHTML(td, jar)
-		if err != nil {
-			logger.Error("Error while fetching topic HTML", "topic Title", td.Title, "topic URL", td.URL, "error", err.Error())
-			errorWhileFetching = true
-		} else {
-			filename := fmt.Sprintf("rustorka-%d.html", i)
-			logger.Info("Topic HTML fetched. Saving to file", "topic Title", td.Title, "topic URL", td.URL, "file", filename)
-			err := os.WriteFile(filename, []byte(html), 0644)
-			if err != nil {
-				logger.Error("Error while saving topic HTML", "topic Title", td.Title, "error", err.Error())
-				errorWhileFetching = true
-			}
+	// Worker pool pattern
+	logger.Info("Fetching topics concurrently")
+	logger.Info("----------------------------")
+
+	var wg sync.WaitGroup
+	var errorWhileFetching atomic.Bool
+	var counter atomic.Int32
+
+	topicDescriptionsChan := make(chan rustorka.TopicDescription, len(topicDescriptions))
+	numWorkers := len(topicDescriptions)
+
+	copyJar := func(jar *cookiejar.Jar) (*cookiejar.Jar, error) { //< copy jar for concurrent use
+		if jar == nil {
+			return nil, fmt.Errorf("nil cookie jar")
 		}
+
+		newJar, err := cookiejar.New(nil)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cookie := range jar.Cookies(u) {
+			newJar.SetCookies(u, []*http.Cookie{cookie})
+		}
+
+		return newJar, nil
 	}
 
-	if errorWhileFetching {
+	for i := 0; i < numWorkers; i++ { //< spawn workers
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for topic := range topicDescriptionsChan {
+				newJar, err := copyJar(jar)
+				if err != nil {
+					logger.Error("Error while copying cookie jar", "error", err.Error())
+					errorWhileFetching.Store(true)
+					continue
+				}
+
+				html, err := rustorka.FetchTopicHTML(topic, newJar)
+
+				if err != nil {
+					logger.Error("Error while fetching topic HTML", "topic Title", topic.Title, "topic URL", topic.URL, "error", err.Error())
+					errorWhileFetching.Store(true)
+					continue
+				}
+
+				filename := fmt.Sprintf("rustorka-%d.html", counter.Load())
+				counter.Add(1)
+				logger.Info("Topic HTML fetched. Saving to file", "topic Title", topic.Title, "topic URL", topic.URL, "file", filename)
+				if err := os.WriteFile(filename, []byte(html), 0644); err != nil {
+					logger.Error("Error while saving topic HTML", "topic Title", topic.Title, "error", err.Error())
+					errorWhileFetching.Store(true)
+				}
+			}
+		}()
+	}
+
+	for _, topic := range topicDescriptions { //< fill channel
+		topicDescriptionsChan <- topic
+	}
+	close(topicDescriptionsChan)
+
+	wg.Wait() //< wait for workers
+
+	if errorWhileFetching.Load() {
 		logger.Error("Error while fetching topics HTML. Return")
 		return
 	}
+
+	logger.Info("Topics HTML fetched and saved")
+	logger.Info("----------------------------")
 
 	// Test parsing topics
 }
