@@ -17,15 +17,12 @@ type ScrapRecord struct {
 	Text             string
 	MainPictureURL   string
 	OtherPicturesURL []string
-}
-
-type ScrapRecordForSummary struct {
-	ScrapRecord
+	Extra            any
 }
 
 type Scrapper interface {
 	Scrap() ([]ScrapRecord, error)
-	ScrapForSummary() ([]ScrapRecordForSummary, error)
+	ScrapForSummary() ([]ScrapRecord, error)
 }
 
 func NewHTTPClient() *http.Client {
@@ -85,7 +82,7 @@ func fetchHTML(client *http.Client, req *http.Request) (string, error) {
 	// Convert the response body from windows-1251 to UTF-8 if needed
 	var reader io.Reader = resp.Body
 	if resp.Header.Get("Content-Type") == "text/html; charset=windows-1251" {
-		logger.Debug("Converting response body from windows-1251 to UTF-8")
+		// logger.Debug("Converting response body from windows-1251 to UTF-8")
 		reader = transform.NewReader(resp.Body, charmap.Windows1251.NewDecoder())
 	}
 

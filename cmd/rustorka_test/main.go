@@ -22,7 +22,7 @@ func main() {
 		return
 	}
 	for _, r := range records {
-		logger.Debug("Record", "title", r.Title)
+		logger.Info("Record", "rec", r)
 	}
 
 	logger.Info("Getting records for summary")
@@ -32,7 +32,7 @@ func main() {
 		return
 	}
 	for _, r := range recordsForSummary {
-		logger.Debug("Record for summary", "title", r.Title)
+		logger.Info("Record for summary", "title", r.Title)
 	}
 
 	logger.Info("✅ Done")

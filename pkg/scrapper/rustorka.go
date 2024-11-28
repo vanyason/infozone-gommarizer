@@ -3,10 +3,12 @@ package scrapper
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/vanyason/infozone-gommaraizer/pkg/logger"
+	"github.com/vanyason/infozone-gommaraizer/pkg/utils"
 	"golang.org/x/net/html"
 )
 
@@ -46,6 +48,11 @@ func (r *RustorkaScrapper) Scrap() ([]ScrapRecord, error) {
 		return nil, err
 	}
 
+	// Save the html
+	if err := utils.Save("rustorka_top30.html", top30HTML); err != nil {
+		logger.Warn("Failed to save Rustorka top 30 downloads HTML", "error", err.Error())
+	}
+
 	// Extract links from the html
 	links, err := r.parseTop30(top30HTML)
 	if err != nil {
@@ -58,10 +65,10 @@ func (r *RustorkaScrapper) Scrap() ([]ScrapRecord, error) {
 	wg := sync.WaitGroup{}
 	wg.Add(len(links))
 
-	logger.Info("Getting Rustorka pages", "count", len(links))
+	logger.Info("Getting Rustorka topics pages", "count", len(links))
 
-	for _, link := range links {
-		go func(link linkToPage) {
+	for idx, link := range links {
+		go func(idx int, link linkToPage) {
 			defer wg.Done()
 
 			logger.Info("Getting", "title", link.Title, "url", link.URL)
@@ -74,8 +81,11 @@ func (r *RustorkaScrapper) Scrap() ([]ScrapRecord, error) {
 				errorsChan <- err
 			} else {
 				htmlChan <- html
+				if err := utils.Save(fmt.Sprintf("rustorka_topic_%d.html", idx), html); err != nil {
+					logger.Warn("Failed to save Rustorka page HTML", "error", err.Error())
+				}
 			}
-		}(link)
+		}(idx, link)
 	}
 
 	wg.Wait()
@@ -89,12 +99,23 @@ func (r *RustorkaScrapper) Scrap() ([]ScrapRecord, error) {
 		return nil, fmt.Errorf("russtorka: %d errors while scraping", len(errorsChan))
 	}
 
-	logger.Debug("All pages scraped", "count", len(htmlChan))
+	// Parse each topic page
+	records := make([]ScrapRecord, 0, len(htmlChan))
 
-	return nil, nil
+	logger.Info("Parsing Rustorka topics pages", "count", len(links))
+	for html := range htmlChan {
+		rec, err := r.parseTopic(html)
+		if err != nil {
+			return nil, err
+		}
+
+		records = append(records, *rec)
+	}
+
+	return records, nil
 }
 
-func (r *RustorkaScrapper) ScrapForSummary() ([]ScrapRecordForSummary, error) {
+func (r *RustorkaScrapper) ScrapForSummary() ([]ScrapRecord, error) {
 	return nil, nil
 }
 
@@ -142,8 +163,8 @@ func (r *RustorkaScrapper) parseTop30(htmlPage string) ([]linkToPage, error) {
 
 	links := make([]linkToPage, 0, 30)
 
-	var extractLinks func(n *html.Node)
-	extractLinks = func(n *html.Node) {
+	var parse func(n *html.Node)
+	parse = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, attr := range n.Attr {
 				if attr.Key == "href" && strings.Contains(attr.Val, "viewtopic.php?t=") {
@@ -153,11 +174,66 @@ func (r *RustorkaScrapper) parseTop30(htmlPage string) ([]linkToPage, error) {
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			extractLinks(c)
+			parse(c)
 		}
 	}
 
-	extractLinks(doc)
+	parse(doc)
 
 	return links, nil
+}
+
+func (r *RustorkaScrapper) parseTopic(htmlPage string) (*ScrapRecord, error) {
+	logger.Info("Parsing Rustorka's topic")
+
+	doc, err := html.Parse(strings.NewReader(htmlPage))
+	if err != nil {
+		return nil, err
+	}
+
+	record := &ScrapRecord{}
+
+	var parse func(n *html.Node)
+	parse = func(n *html.Node) {
+		// Parse Title
+		// Parse Image
+		// Parse Description
+		// Parse Other images
+		// Parse Extra (downloads)
+		if n.Type == html.ElementNode && n.Data == "span" {
+			for _, attr := range n.Attr {
+				if attr.Key == "title" && strings.Contains(attr.Val, "Скачано") {
+					num, err := stringToIntFirstSlpit(n.FirstChild.Data)
+					if err != nil {
+						logger.Warn("Failed to convert string to int", "error", err.Error(), "string", n.FirstChild.Data)
+					} else {
+						record.Extra = num
+					}
+				}
+			}
+		}
+
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			parse(c)
+		}
+	}
+
+	parse(doc)
+	return record, nil
+}
+
+func stringToIntFirstSlpit(input string) (int, error) {
+	// Split the string by spaces to separate the number from the unit
+	parts := strings.Fields(input)
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("input string is empty or invalid")
+	}
+
+	// Parse the first part as an integer
+	number, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert string to int: %w", err)
+	}
+
+	return number, nil
 }

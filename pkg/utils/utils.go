@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"runtime"
 )
 
@@ -36,4 +37,22 @@ func CopyJar(jar *cookiejar.Jar, u *url.URL) (*cookiejar.Jar, error) {
 	}
 
 	return newJar, nil
+}
+
+// Save function saves the content of 'file' to 'fileName'
+func Save(fileName, file string) error {
+	// Create or open the file
+	f, err := os.Create(fileName)
+	if err != nil {
+		return fmt.Errorf("failed to create or open file: %w", err)
+	}
+	defer f.Close() // Ensure the file is closed after the operation
+
+	// Write the content to the file
+	_, err = f.WriteString(file)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	return nil
 }

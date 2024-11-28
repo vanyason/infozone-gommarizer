@@ -14,7 +14,7 @@ test:
 test_rustorka:
 	@echo "Running rustorka tests..."
 	@mkdir -p $(ARTIFACTS_FOLDER)
-	@cd $(ARTIFACTS_FOLDER) && go run ../cmd/rustorka_test/main.go && sed -i '/kot.png/d' rustorka-*html
+	@cd $(ARTIFACTS_FOLDER) && go run ../cmd/rustorka_test/main.go && sed -i '/kot.png/d' rustorka_topic*html
 
 deps:
 	@echo "Installing dependencies..."
