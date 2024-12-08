@@ -89,14 +89,6 @@ func TestWorkerPoolLimitedToCPU() {
 }
 
 func main() {
-	// execAndMeasureTime(TestUnlimitedGoroutines)
-	// execAndMeasureTime(TestWorkerPoolLimitedToCPU)
-
-	arr := [4]int{1, 2, 3, 4}
-	for i, el := range arr {
-		fmt.Println(el)
-		arr[i] = i * 2
-	}
-
-	fmt.Println(arr)
+	execAndMeasureTime(TestUnlimitedGoroutines)
+	execAndMeasureTime(TestWorkerPoolLimitedToCPU)
 }
